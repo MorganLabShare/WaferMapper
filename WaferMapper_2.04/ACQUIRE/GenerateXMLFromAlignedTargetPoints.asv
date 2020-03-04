@@ -1,0 +1,122 @@
+function [  ] = GenerateXMLFromAlignedTargetPoints()
+%This function generates a Fibics readable xml stage map from the currently
+%loaded aligned target points list.
+global GuiGlobalsStruct;
+
+% %Determine what wafer is loaded
+WaferNameIndex = 0;
+for i = 1:length(GuiGlobalsStruct.ListOfWaferNames)
+    WaferName = GuiGlobalsStruct.ListOfWaferNames{i};
+    WaferDirName = sprintf('%s\\%s',...
+        GuiGlobalsStruct.UTSLDirectory, WaferName);
+    if strcmp(GuiGlobalsStruct.WaferDirectory, WaferDirName)
+        WaferNameIndex = i;
+    end
+end
+if WaferNameIndex == 0
+    MyStr = sprintf('Could not find index of current wafer in loaded target points.');
+    uiwait(msgbox(MyStr));
+    return;
+end
+WaferName = GuiGlobalsStruct.ListOfWaferNames{WaferNameIndex};
+
+%Walk through all sections
+for SectionIndex = 1:length(GuiGlobalsStruct.AlignedTargetList.WaferArray(WaferNameIndex).SectionArray)
+    MySection = GuiGlobalsStruct.AlignedTargetList.WaferArray(WaferNameIndex).SectionArray(SectionIndex);
+    %WaferNameIndex
+    %SectionIndex
+    
+    GuiGlobalsStruct.MontageTarget.MicronsPerPixel = MySection.SectionOveriewInfo.FOV_microns/MySection.SectionOveriewInfo.ImageWidthInPixels;
+    GuiGlobalsStruct.MontageTarget.StageX_Meters_CenterOriginalOverview = MySection.SectionOveriewInfo.StageX_Meters;
+    GuiGlobalsStruct.MontageTarget.StageY_Meters_CenterOriginalOverview = MySection.SectionOveriewInfo.StageY_Meters;
+    GuiGlobalsStruct.MontageTarget.OverviewImageWidthInPixels = MySection.SectionOveriewInfo.ImageWidthInPixels;
+    GuiGlobalsStruct.MontageTarget.OverviewImageHeightInPixels = MySection.SectionOveriewInfo.ImageHeightInPixels;
+    
+    GuiGlobalsStruct.MontageTarget.Alignment_r_offset = MySection.AlignmentParameters.r_offset;
+    GuiGlobalsStruct.MontageTarget.Alignment_c_offset = MySection.AlignmentParameters.c_offset;
+    GuiGlobalsStruct.MontageTarget.Alignment_AngleOffsetInDegrees = MySection.AlignmentParameters.AngleOffsetInDegrees;
+    GuiGlobalsStruct.MontageTarget.LabelStr = MySection.LabelStr;
+    
+    
+    %First get target point coords in pixels relative to center of image
+    y_pixels = -( GuiGlobalsStruct.MontageTarget.r - floor(GuiGlobalsStruct.MontageTarget.OverviewImageHeightInPixels/2) );
+    x_pixels = GuiGlobalsStruct.MontageTarget.c - floor(GuiGlobalsStruct.MontageTarget.OverviewImageWidthInPixels/2);
+    
+    %Then apply a rotation of this
+    theta_rad = (pi/180)*GuiGlobalsStruct.MontageTarget.Alignment_AngleOffsetInDegrees;
+    cosTheta = cos(theta_rad);
+    sinTheta = sin(theta_rad);
+    x_prime_pixels = cosTheta*x_pixels + sinTheta*y_pixels;
+    y_prime_pixels = -sinTheta*x_pixels + cosTheta*y_pixels;
+    
+    %HERE IS WHERE I ADD IN THE CORRECTION FROM THE AlignedTargetList
+    r_offset = MySection.YOffsetOfNewInPixels; %Note: Here is where the reversed Y-Axis sign change is fixed
+    c_offset = - MySection.XOffsetOfNewInPixels;
+    GuiGlobalsStruct.MontageTarget.Alignment_r_offset = GuiGlobalsStruct.MontageTarget.Alignment_r_offset...
+        +r_offset;
+    GuiGlobalsStruct.MontageTarget.Alignment_c_offset = GuiGlobalsStruct.MontageTarget.Alignment_c_offset...
+        +c_offset;
+    
+    %Then apply the translation offsets that were needed to align this image
+    x_prime_pixels = x_prime_pixels - GuiGlobalsStruct.MontageTarget.Alignment_c_offset;
+    y_prime_pixels = y_prime_pixels + GuiGlobalsStruct.MontageTarget.Alignment_r_offset;
+    
+    %now convert this to stage coordinates
+    StageX_Meters_CenterOriginalOverview = GuiGlobalsStruct.MontageTarget.StageX_Meters_CenterOriginalOverview;
+    StageY_Meters_CenterOriginalOverview = GuiGlobalsStruct.MontageTarget.StageY_Meters_CenterOriginalOverview;
+    
+    StageX_Meters = StageX_Meters_CenterOriginalOverview - ...
+        x_prime_pixels*(GuiGlobalsStruct.MontageTarget.MicronsPerPixel/1000000);
+    StageY_Meters = StageY_Meters_CenterOriginalOverview - ...
+        y_prime_pixels*(GuiGlobalsStruct.MontageTarget.MicronsPerPixel/1000000);%Note: This function already applies the stage correction transformation
+    %and angle correction
+    ScanRot_Degrees = -GuiGlobalsStruct.MontageTarget.Alignment_AngleOffsetInDegrees;% -GuiGlobalsStruct.MontageTarget.MontageNorthAngle;
+    
+    %First apply the current stage transformation if it exists
+if isfield(GuiGlobalsStruct,'StageTransform')
+    if ~isempty(GuiGlobalsStruct.StageTransform)
+        
+        
+        disp(sprintf('Before transform (%d, %d)',StageX_Meters, StageY_Meters));
+        [StageX_Meters, StageY_Meters] = tformfwd(GuiGlobalsStruct.StageTransform,[StageX_Meters],[StageY_Meters]);
+        ScanRot_Degrees = GuiGlobalsStruct.StageTransformScanRotationAngleInDegrees + ScanRot_Degrees;
+        disp(sprintf('After transform (%d, %d)',StageX_Meters, StageY_Meters));
+    else
+        GuiGlobalsStruct.MyCZEMAPIClass.Set_PassedTypeSingle('AP_SCANROTATION',ScanRot_Degrees);
+        GuiGlobalsStruct.StageTransformScanRotationAngleInDegrees = 0;
+    end
+else
+    GuiGlobalsStruct.MyCZEMAPIClass.Set_PassedTypeSingle('AP_SCANROTATION',ScanRot_Degrees);
+    GuiGlobalsStruct.StageTransformScanRotationAngleInDegrees = 0;
+end
+    
+    %NOTE: YOU NEED TO CHECK IF BETWEEN 0 and 360 and correct here
+    if ScanRot_Degrees > 360
+        ScanRot_Degrees = ScanRot_Degrees - 360;
+    end
+    
+    if ScanRot_Degrees < 0
+        ScanRot_Degrees = ScanRot_Degrees + 360;
+    end
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+end
+end
+
+%generate_xml_file(DirNameOfTempImageMatFiles)
+generate_xml_file(GuiGlobalsStruct.TempImagesDirectory);

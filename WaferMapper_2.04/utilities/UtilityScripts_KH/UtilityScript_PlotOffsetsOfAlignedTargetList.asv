@@ -1,0 +1,9 @@
+function UtilityScript_PlotOffsetsOfAlignedTargetList()
+
+load Z:\Hayworth\MasterUTSLDir\Cerebellum_JM_YR1C_ForPosTest_UTSL\AlignedTargetListsDirectory\TargetPoint01\AlignedTargetList.mat;
+
+Scale
+
+for SectionNum = 1:length(AlignedTargetList.WaferArray(1).SectionArray)
+    AlignedTargetList.WaferArray(1).SectionArray(i).XOffsetOfNewInPixels
+end

@@ -1,0 +1,10 @@
+function SetSectionOverviewProcessingParametersDefaults()
+%UNTITLED Summary of this function goes here
+%   Detailed explanation goes here
+global GuiGlobalsStruct;
+
+%default Wafer Parameters
+GuiGlobalsStruct.SectionOverviewProcessingParameters.
+
+end
+

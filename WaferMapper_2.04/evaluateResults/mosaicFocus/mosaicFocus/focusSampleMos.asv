@@ -1,0 +1,70 @@
+%% Turn mosaics from waffer into viewable (centers and downsample) mosaics
+
+%% Get Waffer folder information
+wif = GetMyWafer;
+
+%% View stitched
+
+%% Parse XML
+[tree, rootname, dom]=xml_read(wif.xml{end});
+overlap = tree.MosaicSetup.TileOverlapXum;
+xs = tree.MosaicSetup.TileWidth;
+ys = tree.MosaicSetup.TileHeight;
+res = tree.MosaicSetup.PixelSize;
+pixelOverlap = fix(overlap / res * 1000);
+
+%% Target Dir 
+TPN = wif.dir; TPN = [TPN(1:end-1) 'Shaped\'];
+TPNsub = [TPN 'subsamp\'];
+if ~exist(TPNsub),mkdir(TPNsub);end
+
+%% stitch downSampled
+colormap gray(256)
+isize = 200;
+subReg = [round(xs/2 - isize/2) round(xs/2 - isize/2) + isize-1];
+
+
+for s = 1 : length(wif.sec) % run sections
+    sprintf('reading tile %d of %d',s,length(wif.sec))
+    rc = wif.sec(s).rc;
+    mosDim = max(rc,[],1);
+    
+    [tree, rootname, dom]=xml_read(wif.sec(s).xml);
+    mos = zeros(max(rc(:,1)),max(rc(:,2)),3);
+    for t = 1:length(tree.Tiles.Tile)
+        tile = tree.Tiles.Tile(t);
+        wd(rc(t,1),rc(t,2)) = tile.WD * 1000;
+        stigX(rc(t,1),rc(t,2)) = tile.StigX ;
+        stigY(rc(t,1),rc(t,2)) = tile.StigY ;
+        
+    end
+    
+    stigX = abs(stigX) * 25.6;
+    stigY = abs(stigY) * 25.6;
+    wd = wd - mean(wd(:));
+    
+    image(uint8(mos)*100)
+    
+%     %[tree, rootname, dom]=xml_read(wif.sec(s).xml);
+%     mos = zeros(mosDim*isize,'uint8');
+%     for t = 1:length(wif.sec(s).tile)
+% 
+%         ystart = (rc(t,1)-1)*isize+1;
+%         xstart = (rc(t,2)-1)*isize+1;
+%         I = imread(wif.sec(s).tile{t},'PixelRegion',{subReg,subReg});
+%         mos(ystart:ystart+size(I,1)-1,xstart:xstart+size(I,2)-1) = 255-I;
+%         %image(mos),pause(.1)
+%     end
+%     image(mos),pause(1)
+%     imwrite(mos,[TPNsub wif.secNam{s} '.tif'],'Compression','none')
+end
+
+
+
+
+
+
+
+
+
+

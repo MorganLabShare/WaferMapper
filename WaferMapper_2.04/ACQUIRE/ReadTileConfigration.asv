@@ -1,0 +1,112 @@
+function [TileConfiguration] = ReadTileConfigration(MontageDir)
+
+TileConfiguration = []; %default answer
+
+TileConfigurationTextFileName = sprintf('%s\\TileConfiguration.txt.registered', MontageDir);
+if ~exist(TileConfigurationTextFileName, 'file')
+    disp(sprintf('%s does not exist. Exiting.', TileConfigurationTextFileName));
+    return;
+end
+
+fid = fopen(TileConfigurationTextFileName);
+
+%skip beginning lines
+while true
+    tline = fgetl(fid);
+    if strcmp(tline, '# Define the image coordinates')
+        break;
+    end
+    
+end
+
+%Parse tile coordinates
+while true
+    tline = fgetl(fid);
+    if ~ischar(tline)
+        break;
+    end
+    SemicolonIndexArray = strfind(tline, ';');
+    if length(SemicolonIndexArray) ~= 2
+        disp(sprintf('Parse error. Exiting.'));
+        fclose(fid); 
+        return;
+    end
+    
+    %F:/JM_YR1C_Data/w010_Sec1_Montage/Tile_r3-c5_w010_sec1.tif; ; (46473.395, 23493.02)
+    %parse for file name
+    FileNameStr = tline(1:SemicolonIndexArray(1)-1);
+    CoordStr = tline(SemicolonIndexArray(2)+1:end);
+    [pathstr, JustFileName, Extension] = fileparts(FileNameStr);
+    JustFileName = sprintf('%s%s', JustFileName, Extension);
+    
+    %parse for row and column numbers
+    IndexArray01 = strfind(FileNameStr, 'Tile_r');
+    PostfixStr = FileNameStr(IndexArray01(end):end);
+    IndexArray02 = strfind(PostfixStr, 'Tile_r');
+    IndexArray03 = strfind(PostfixStr, '-c');
+    RowStr = PostfixStr(IndexArray02(1)+6:IndexArray03(1)-1);
+    RowNum = str2double(RowStr);
+    PostfixStr02 = PostfixStr(IndexArray03(1)+2:end);
+    IndexArray04 = strfind(PostfixStr02, '_');
+    ColStr = PostfixStr02(1:IndexArray04(1)-1);
+    ColNum = str2double(ColStr);
+    
+    
+    %parse for coordinates
+    FirstParenthesisIndexArray = strfind(CoordStr, '(');
+    CommaIndexArray = strfind(CoordStr, ',');
+    LastParenthesisIndexArray = strfind(CoordStr, ')');
+    XCoordStr = CoordStr(FirstParenthesisIndexArray(1)+1:CommaIndexArray(1)-1);
+    XCoord = str2double(XCoordStr);
+    YCoordStr = CoordStr(CommaIndexArray(1)+1:LastParenthesisIndexArray(1)-1);
+    YCoord = str2double(YCoordStr);
+    
+    %save in return structure
+    TileConfiguration.TileArray(RowNum, ColNum).JustFileName = JustFileName;
+    TileConfiguration.TileArray(RowNum, ColNum).XCoord = XCoord;
+    TileConfiguration.TileArray(RowNum, ColNum).YCoord = YCoord;
+end
+      
+%close file
+fclose(fid);   
+
+
+%Finally read the size of the first file
+FirstFileNameAndPath = sprintf('%s\\%s', MontageDir, TileConfiguration.TileArray(1, 1).JustFileName);
+
+if ~exist(FirstFileNameAndPath, 'file')
+    disp(sprintf('%s does not exist. Exiting.', FirstFileNameAndPath));
+    return;
+end
+
+%INFO = IMFINFO(FILENAME,FMT)
+info = imfinfo(FirstFileNameAndPath, 'tif');
+TileConfiguration.TileWidthInPixels = info(1).Width;
+TileConfiguration.TileHeightInPixels = info(1).Height;
+
+%determine all boundaries
+[MaxRow, MaxCol] = size(TileConfiguration.TileArray);
+for RowNum = 1:MaxRow
+    for ColNum = 1:MaxCol
+        CenterX = TileConfiguration.TileArray(RowNum, ColNum).XCoord;
+        CenterY = TileConfiguration.TileArray(RowNum, ColNum).YCoord;
+        
+        if RowNum == 1
+            TileConfiguration.TileArray(RowNum, ColNum).MinX = CenterX - TileConfiguration.TileWidthInPixels/2;
+        else
+            TileConfiguration.TileArray(RowNum, ColNum).MinX = (CenterX + TileConfiguration.TileArray(RowNum-1, ColNum).XCoord)/2;
+        end
+        
+        
+        
+        
+    end
+end
+
+
+end
+
+
+
+
+

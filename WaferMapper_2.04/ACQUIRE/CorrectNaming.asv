@@ -1,0 +1,15 @@
+
+
+for i = 1:95
+
+    DataFileNameStr = sprintf('Y:\Hayworth\MasterUTSLDirectory\CortexUTSL004\Wafer005\SectionOverviewsDirectory\\SectionOverview_%s.mat',...
+        LabelStr);
+    
+    My
+    load(DataFileNameStr, 'SectionOveriewInfo');
+    
+    Info = SectionOveriewInfo;
+    
+    save(DataFileNameStr, 'Info');
+    
+end

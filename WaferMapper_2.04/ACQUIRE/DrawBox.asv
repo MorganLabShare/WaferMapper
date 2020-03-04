@@ -1,0 +1,11 @@
+function DrawBox(CenterX, CenterY, Width, Height, ColorArray)
+    LeftX =  CenterX - floor(Width/2);
+    RightX = LeftX + Width;
+    TopY = CenterY - floor(Height/2);
+    BottomY = TopY + Height;
+    
+    line([LeftX LeftX],[TopY BottomY]); %left line
+    line([RightX RightX],[TopY BottomY]); %right line
+    line([LeftX RightX],[TopY TopY]); %top line
+    line([LeftX RightX],[BottomY BottomY]); %bottom line
+end
